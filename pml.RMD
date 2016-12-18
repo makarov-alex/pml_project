@@ -1,0 +1,73 @@
+---
+title: 'Coursera: Practical Machine Leraning course project'
+author: "Alexander Makarov"
+date: "16 December 2016"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(cache=TRUE)
+library("caret")
+```
+## Executive summary
+Fitness trackers allow to collect large amount of data about personal activity relatively inexpensively. In this project, we analze data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information about data is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).  
+The report describes the process of builting predicting model, using provided data. Firstly, we clean dataset in order to remove columns which could not be predictors. Secondly, we divide data set into train and data datasets. Finally, we apply Random Forest model and get 99.16% aacuracy prediction.Our out-sample error is below 0.5% and we get 100% accuracy on test dataset which containcs 20 obsrvations.
+## Data preparation
+Firsly, let's download data
+```{r}
+download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv","pml_training.csv")
+download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv","pml_testing.csv")
+pml_training<-read.csv("pml_training.csv",na.strings= c("#DIV/0", "", "NA"))
+pml_testing<-read.csv("pml_testing.csv",na.strings= c("#DIV/0", "", "NA"))
+```
+If we take a look at training dataset, we can see that there are a lot of NA data. As it is not helpful for us in terms of prediction, let get rid of it.
+```{r}
+pml_training_clean <- data.frame(matrix(0, ncol = 0, nrow = 19622))
+for(i in 1:dim(pml_training)[2]) 
+{
+    if(sum(is.na(pml_training[,i]))/dim(pml_training)[1]<=0.7)
+    pml_training_clean<-cbind(pml_training_clean,pml_training[i])
+}
+pml_training_clean<-pml_training_clean[-(1:7)]
+```
+## Cross validation
+Let's do cross validation, dividing our datasets into two dubsets: train and testing:
+
+```{r}
+set.seed(123)
+inTrain <- createDataPartition(y=pml_training_clean$classe, p=0.6, list=FALSE)
+myTrain <- pml_training_clean[inTrain, ]
+myTest <- pml_training_clean[-inTrain, ]
+```
+## Modeling
+Now let's build Radom Forest model, using Caret package.
+
+```{r}
+rf_fit<-train(classe~.,method="rf",data=myTrain)
+```
+
+```{r}
+pred_rf_train<-predict(rf_fit,myTrain)
+confusionMatrix(pred_rf_train,myTrain$classe)
+```
+Model accuracy is higher than 99%, sample error - 0.0003  
+Let's predict values using our model and calculate accuracy:
+
+```{r}
+pred_rf<-predict(rf_fit,myTest)
+confusionMatrix(pred_rf,myTest$classe)
+```
+From the information above we can see, that model accuracy is higher than 99%, with out of sample error 0.0008, which is little bit higher, than sample error. All in, we got a very accurate model, it could be considered final. And we will use it for prediction on test dataset.  
+Also we can take a look into important predictors. The most important variable is "roll belt". 
+
+```{r}
+varImp(rf_fit)
+```
+## Prediction (test dataset)
+Let's apply out model on testing dataset and get answeres for the quiz:
+
+```{r eval=FALSE}
+pred_pml_testing <- predict(rf_fit, pml_testing)
+pred_pml_testing
+```
